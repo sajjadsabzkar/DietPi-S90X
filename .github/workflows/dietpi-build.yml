@@ -172,3 +172,5 @@ jobs:
         [ "${{ github.event.inputs.testkernel }}" == 'true' ] && buildargs="$buildargs --test-kernel"
         [ "${{ github.event.inputs.testuboot }}" == 'true' ] && buildargs="$buildargs --test-uboot"
         sudo bash -c "G_GITOWNER=$GITHUB_REPOSITORY_OWNER G_GITBRANCH=$GITHUB_REF_NAME; $(curl -sSf "https://raw.githubusercontent.com/$GITHUB_REPOSITORY_OWNER/DietPi/$GITHUB_REF_NAME/.build/images/dietpi-build" || echo false)" -- $buildargs --sign '${{ secrets.GPG_PASS }}' --upload-script 'upload.sh'
+
+# Fork activation: bump to re-scan fork workflows for manual dispatch
