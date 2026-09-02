@@ -1,0 +1,4 @@
+#!/bin/dash -e
+echo 'Syncing initramfs image to the FAT boot partition'
+cp -fv "/boot/initrd.img-$1" /boot/initrd.img
+exit 0
