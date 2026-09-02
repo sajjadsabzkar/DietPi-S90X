@@ -727,9 +727,13 @@ setenv bootlabel "DietPi"' /boot/boot.cmd
 				G_CONFIG_INJECT 'fdtfile=' 'fdtfile=amlogic/meson-gxl-s905x-p212.dtb' /boot/dietpiEnv.txt
 				# FAT /boot does not support symlinks, hence the initramfs hook must copy instead of symlink
 				G_EXEC mv "$dir/.build/images/TVBoxS90X/99-dietpi-uboot" /etc/initramfs/post-update.d/99-dietpi-uboot
-				# Generate the Amlogic multiboot scripts and fetch the multiboot U-Boot binaries from the Armbian aml-s9xx-box project
+				# Generate the Amlogic multiboot script sources on /boot, compiled once U-Boot tools are installed
+			# - The source archive is deleted later, hence the .cmd files are staged here
 				G_DIETPI-NOTIFY 2 'Generating and fetching TVBox S90X multiboot U-Boot and boot scripts'
 				local dir_uboot_url='https://raw.githubusercontent.com/armbian/build/main/config/optional/boards/aml-s9xx-box/_packages/bsp-cli/boot'
+				G_EXEC cp "$dir/.build/images/TVBoxS90X/aml-autoscript.cmd" /boot/aml-autoscript.cmd
+				G_EXEC cp "$dir/.build/images/TVBoxS90X/s905-autoscript.cmd" /boot/s905-autoscript.cmd
+				G_EXEC cp "$dir/.build/images/TVBoxS90X/emmc-autoscript.cmd" /boot/emmc-autoscript.cmd
 				G_EXEC_OUTPUT=1 G_EXEC curl -sfL "$dir_uboot_url/u-boot-s905x-s912" -o /boot/u-boot.ext
 				G_EXEC_OUTPUT=1 G_EXEC curl -sfL "$dir_uboot_url/u-boot-s905x2-s922" -o /boot/u-boot-s905x2-s922
 				G_EXEC cp "$dir/.build/images/TVBoxS90X/install-dietpi.emmc.sh" /boot/install-dietpi.emmc.sh
@@ -1319,12 +1323,13 @@ fi' /boot/boot.cmd
 			G_AGI initramfs-tools zstd armbian-firmware u-boot-tools
 			G_CONFIG_INJECT 'COMPRESS=' 'COMPRESS=zstd' /etc/initramfs-tools/initramfs.conf
 
-			# TVBox S90X: Generate the Amlogic multiboot scripts, now that U-Boot tools are installed
+			# TVBox S90X: Generate the Amlogic multiboot scripts, now that U-Boot tools are installed, from the sources staged on /boot
 			if (( $G_HW_MODEL == 110 ))
 			then
-				G_EXEC mkimage -C none -A arm64 -T script -d "$dir/.build/images/TVBoxS90X/aml-autoscript.cmd" /boot/aml_autoscript
-				G_EXEC mkimage -C none -A arm64 -T script -d "$dir/.build/images/TVBoxS90X/s905-autoscript.cmd" /boot/s905_autoscript
-				G_EXEC mkimage -C none -A arm64 -T script -d "$dir/.build/images/TVBoxS90X/emmc-autoscript.cmd" /boot/emmc_autoscript
+				G_EXEC mkimage -C none -A arm64 -T script -d /boot/aml-autoscript.cmd /boot/aml_autoscript
+				G_EXEC mkimage -C none -A arm64 -T script -d /boot/s905-autoscript.cmd /boot/s905_autoscript
+				G_EXEC mkimage -C none -A arm64 -T script -d /boot/emmc-autoscript.cmd /boot/emmc_autoscript
+				G_EXEC rm -f /boot/aml-autoscript.cmd /boot/s905-autoscript.cmd /boot/emmc-autoscript.cmd
 			fi
 
 			# Install testing kernel build if requested
