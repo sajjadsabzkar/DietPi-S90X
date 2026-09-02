@@ -26,7 +26,7 @@ FP_SD_DEV=${FP_SDCARD%p*}
 FP_EMMC=/dev/mmcblk1
 [[ -b $FP_SD_DEV ]] || Error_Exit "SD card drive not found: $FP_SD_DEV"
 [[ -b $FP_EMMC ]] || Error_Exit "intern eMMC drive not found: $FP_EMMC"
-[[ $FP_SD_DEV == $FP_EMMC ]] && Error_Exit 'Refusing to copy the SD card onto itself'
+[[ $FP_SD_DEV == "$FP_EMMC" ]] && Error_Exit 'Refusing to copy the SD card onto itself'
 
 # Copy only the used size of the SD card
 used_bytes=$(( ( $(sfdisk -qlo End "$FP_SD_DEV" | tail -1) + 1 ) * 512 ))

@@ -38,7 +38,6 @@ echo ""
 run storeboot'
 # END bootcmd
 
-
 # Sdcard RUN s905_autoscript from part 1 OR 2 START s905_autoscript
 setenv start_mmc_autoscript 'echo start_mmc_autoscript; echo ""; if fatload mmc 0:2 1020000 s905_autoscript || fatload mmc 0:1 1020000 s905_autoscript; then autoscr 1020000; fi;'
 
@@ -50,7 +49,6 @@ setenv start_emmc_autoscript 'echo start_emmc_autoscript;echo "";fatload mmc 1 1
 
 # BOOT order SD , USB , INTERNAL  IF FOUND SD USB eMMCe RUN start_XXYY_autoscript
 setenv start_autoscript 'echo "START AUTOSCRIPT";if mmcinfo; then run start_mmc_autoscript; fi; if usb start; then run start_usb_autoscript; fi; run start_emmc_autoscript'
-
 
 echo ""
 echo  "!!!!!!! UPDATE END REBOOT !!!!!!!"
