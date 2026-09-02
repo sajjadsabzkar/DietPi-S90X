@@ -446,6 +446,7 @@ _EOF_
 						'108' ': Orange Pi Zero 3W'
 						'86' ': ASUS Tinker Board 2'
 						'109' ': LubanCat 4'
+						'110' ': TVBox S90X'
 						'23' ': Generic Rockchip RK3328'
 						'24' ': Generic Rockchip RK3399'
 						'26' ': Generic Allwinner H5'
@@ -673,7 +674,7 @@ _EOF_
 			G_EXEC ln -sf /etc/kernel/post{inst,rm}.d/dietpi-initramfs_cleanup
 
 		# SBCs using Armbian build system for kernel/bootloader packages and boot.scr
-		elif [[ $G_HW_MODEL =~ ^(12|14|15|16|17|18|19|40|42|43|44|45|46|47|48|52|54|55|56|57|58|59|60|63|64|65|66|67|68|72|73|74|76|77|78|79|80|82|83|85|86|87|88|89|90|91|92|93|94|95|96|99|100|101|102|103|104|105|106|107|108|109)$ ]]
+		elif [[ $G_HW_MODEL =~ ^(12|14|15|16|17|18|19|40|42|43|44|45|46|47|48|52|54|55|56|57|58|59|60|63|64|65|66|67|68|72|73|74|76|77|78|79|80|82|83|85|86|87|88|89|90|91|92|93|94|95|96|99|100|101|102|103|104|105|106|107|108|109|110)$ ]]
 		then
 			# Amlogic 64-bit
 			armbian_packages=1
@@ -715,6 +716,25 @@ setenv bootlabel "DietPi"' /boot/boot.cmd
 
 				# Odroid N2: Assure that hardware random generator driver is loaded as early as possible to prevent rngd failures: https://github.com/MichaIng/DietPi/issues/6483
 				(( $G_HW_MODEL == 15 )) && G_EXEC eval 'echo '\''meson_rng'\'' > /etc/modules-load.d/dietpi-hwrng.conf'
+
+			# TVBox S90X: Cheap Amlogic TV boxes, booting via the vendor firmware and a chain-loaded Armbian multiboot U-Boot: https://github.com/armbian/build/tree/main/config/optional/boards/aml-s9xx-box
+			elif (( $G_HW_MODEL == 110 ))
+			then
+				# Replace the standard boot script with the TVBox one, which does not rely on U-Boot env defaults and detects whether it runs from SD, eMMC or USB
+				G_EXEC mv "$dir/.build/images/TVBoxS90X/boot.cmd" /boot/boot.cmd
+				G_CONFIG_INJECT 'fdtfile=' 'fdtfile=amlogic/meson-gxl-s905x-p212.dtb' /boot/dietpiEnv.txt
+				# FAT /boot does not support symlinks, hence the initramfs hook must copy instead of symlink
+				G_EXEC mv "$dir/.build/images/TVBoxS90X/99-dietpi-uboot" /etc/initramfs/post-update.d/99-dietpi-uboot
+				# Stage the Amlogic multiboot script sources on /boot, compiled once U-Boot tools are installed, and fetch the multiboot U-Boot binaries from the Armbian aml-s9xx-box project
+				# - The source archive is deleted later, hence the .cmd files are staged here
+				G_DIETPI-NOTIFY 2 'Generating and fetching TVBox S90X multiboot U-Boot and boot scripts'
+				local ubootdir_url='https://raw.githubusercontent.com/armbian/build/main/config/optional/boards/aml-s9xx-box/_packages/bsp-cli/boot'
+				G_EXEC cp "$dir/.build/images/TVBoxS90X/aml-autoscript.cmd" /boot/aml-autoscript.cmd
+				G_EXEC cp "$dir/.build/images/TVBoxS90X/s905-autoscript.cmd" /boot/s905-autoscript.cmd
+				G_EXEC cp "$dir/.build/images/TVBoxS90X/emmc-autoscript.cmd" /boot/emmc-autoscript.cmd
+				G_EXEC_OUTPUT=1 G_EXEC curl -sfL "$ubootdir_url/u-boot-s905x-s912" -o /boot/u-boot.ext
+				G_EXEC_OUTPUT=1 G_EXEC curl -sfL "$ubootdir_url/u-boot-s905x2-s922" -o /boot/u-boot-s905x2-s922
+				G_EXEC cp "$dir/.build/images/TVBoxS90X/install-dietpi.emmc.sh" /boot/install-dietpi.emmc.sh
 
 			# Rockchip 64-bit
 			elif [[ $G_HW_MODEL =~ ^(14|18|19|42|43|46|47|55|56|58|68|72|73|76|77|78|79|80|82|85|86|87|90|91|92|93|94|95|100|101|102|103|104|105|106|109)$ ]]
@@ -1246,6 +1266,7 @@ _EOF_
 				107) model='orangepi4pro' kernel='sun60iw2' branch='vendor';;
 				108) model='orangepizero3w' kernel='sun60iw2' branch='vendor';;
 				109) model='lubancat-4' kernel='rockchip64';;
+				110) kernel='meson64';; # No U-Boot package, the TVBox uses the vendor firmware and chain-loaded Armbian multiboot U-Boot
 				*) G_DIETPI-NOTIFY 1 "Unknown hardware ID \"$G_HW_MODEL\". Aborting ..."; exit 1;;
 			esac
 
@@ -1300,6 +1321,15 @@ fi' /boot/boot.cmd
 			G_AGI initramfs-tools zstd armbian-firmware u-boot-tools
 			G_CONFIG_INJECT 'COMPRESS=' 'COMPRESS=zstd' /etc/initramfs-tools/initramfs.conf
 
+			# TVBox S90X: Generate the Amlogic multiboot scripts, now that U-Boot tools are installed, from the sources staged on /boot
+			if (( $G_HW_MODEL == 110 ))
+			then
+				G_EXEC mkimage -C none -A arm64 -T script -d /boot/aml-autoscript.cmd /boot/aml_autoscript
+				G_EXEC mkimage -C none -A arm64 -T script -d /boot/s905-autoscript.cmd /boot/s905_autoscript
+				G_EXEC mkimage -C none -A arm64 -T script -d /boot/emmc-autoscript.cmd /boot/emmc_autoscript
+				G_EXEC rm -f /boot/aml-autoscript.cmd /boot/s905-autoscript.cmd /boot/emmc-autoscript.cmd
+			fi
+
 			# Install testing kernel build if requested
 			if (( $TEST_KERNEL ))
 			then
@@ -1311,13 +1341,24 @@ fi' /boot/boot.cmd
 			# Install testing U-Boot build if requested
 			if (( $TEST_UBOOT ))
 			then
-				G_EXEC_OUTPUT=1 G_EXEC curl -fo package.deb "https://dietpi.com/downloads/binaries/testing/linux-u-boot-$model-$branch.deb"
-				G_EXEC_OUTPUT=1 G_EXEC dpkg -i package.deb
-				G_EXEC rm package.deb
+				# TVBox S90X: There is no U-Boot package to flash
+				if (( $G_HW_MODEL == 110 ))
+				then
+					G_DIETPI-NOTIFY 1 'No U-Boot package available for the TVBox S90X, skipping'
+
+				else
+					G_EXEC_OUTPUT=1 G_EXEC curl -fo package.deb "https://dietpi.com/downloads/binaries/testing/linux-u-boot-$model-$branch.deb"
+					G_EXEC_OUTPUT=1 G_EXEC dpkg -i package.deb
+					G_EXEC rm package.deb
+				fi
 			fi
 
 			# Install kernel and bootloader
-			G_AGI "linux-image-$branch-$kernel" "linux-u-boot-$model-$branch"
+			# - TVBox S90X: No U-Boot package, since the bootloader is flashed in factory and can only be restored via USB boot
+			local apackages=("linux-image-$branch-$kernel")
+			[[ $model ]] && apackages+=("linux-u-boot-$model-$branch")
+			G_AGI "${apackages[@]}"
+			unset -v apackages
 
 			# Cleanup
 			(( $G_HW_MODEL == 10 )) || G_EXEC rm -f /boot/uImage /boot/uInitrd*
@@ -1332,7 +1373,13 @@ fi' /boot/boot.cmd
 			[[ -f '/boot/boot.cmd' ]] && G_EXEC mkimage -C none -A "$arch" -T script -d /boot/boot.cmd /boot/boot.scr
 
 			# Flash U-Boot
-			/boot/dietpi/func/dietpi-set_hardware flash-u-boot-mmc "$BOOT_DEVICE"
+			if (( $G_HW_MODEL == 110 ))
+			then
+				# TVBox S90X: Skip, the box boots via the vendor firmware U-Boot on the internal eMMC, flashed in factory
+				G_DIETPI-NOTIFY 2 'Skipping U-Boot flashing, the TVBox S90X uses the vendor firmware U-Boot which is flashed in factory'
+			else
+				/boot/dietpi/func/dietpi-set_hardware flash-u-boot-mmc "$BOOT_DEVICE"
+			fi
 
 			# Radxa Zero: Enable USB OTG OOTB: https://github.com/MichaIng/DietPi/issues/5931
 			if (( $G_HW_MODEL == 74 ))
