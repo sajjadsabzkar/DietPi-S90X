@@ -130,6 +130,7 @@ _EOF_
 
 	# Set Git owner
 	GITOWNER=${GITOWNER:-MichaIng}
+	GITREPO=${GITREPO:-DietPi}
 
 	# Select Git branch
 	if [[ ! $GITBRANCH ]]
@@ -147,14 +148,14 @@ _EOF_
 		fi
 		unset -v aWHIP_BRANCH
 	fi
-	echo "[ INFO ] Selected Git branch: $GITOWNER/$GITBRANCH"
+	echo "[ INFO ] Selected Git branch: $GITOWNER/$GITREPO/$GITBRANCH"
 
 	#------------------------------------------------------------------------------------------------
 	# DietPi-Globals
 	#------------------------------------------------------------------------------------------------
 	# NB: We have to manually handle errors, until DietPi-Globals are successfully loaded.
 	# Download
-	if ! curl -sSf "https://raw.githubusercontent.com/$GITOWNER/DietPi/$GITBRANCH/dietpi/func/dietpi-globals" -o dietpi-globals
+	if ! curl -sSf "https://raw.githubusercontent.com/$GITOWNER/$GITREPO/$GITBRANCH/dietpi/func/dietpi-globals" -o dietpi-globals
 	then
 		echo -e '[FAILED] Unable to download dietpi-globals. Aborting...\n'
 		exit 1
@@ -178,8 +179,9 @@ _EOF_
 
 	# Apply Git info
 	G_GITOWNER=$GITOWNER
+	G_GITREPO=$GITREPO
 	G_GITBRANCH=$GITBRANCH
-	unset -v GITOWNER GITBRANCH
+	unset -v GITOWNER GITREPO GITBRANCH
 
 	# Detect the distro version of this operating system
 	read -r distro < /etc/debian_version
@@ -629,7 +631,7 @@ _EOF_
 		G_DIETPI-NOTIFY 3 "$G_PROGRAM_NAME" "[$SETUP_STEP] Downloading and installing DietPi source code"; ((SETUP_STEP++))
 		#------------------------------------------------------------------------------------------------
 
-		G_EXEC_DESC='Downloading source code' G_EXEC curl -sSfLO "https://github.com/$G_GITOWNER/DietPi/archive/$G_GITBRANCH.tar.gz"
+		G_EXEC_DESC='Downloading source code' G_EXEC curl -sSfLO "https://github.com/$G_GITOWNER/$G_GITREPO/archive/$G_GITBRANCH.tar.gz"
 		local dir="DietPi-${G_GITBRANCH//\//-}" # GitHub translates forward slashes into dashes
 		[[ -d $dir ]] && G_EXEC_DESC='Removing old source code' G_EXEC rm -R "$dir"
 		G_EXEC_DESC='Unpacking source code' G_EXEC tar xf "${G_GITBRANCH##*/}.tar.gz" # Support for Git branch names with forward slashes
