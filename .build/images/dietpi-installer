@@ -727,15 +727,19 @@ setenv bootlabel "DietPi"' /boot/boot.cmd
 				G_CONFIG_INJECT 'fdtfile=' 'fdtfile=amlogic/meson-gxl-s905x-p212.dtb' /boot/dietpiEnv.txt
 				# FAT /boot does not support symlinks, hence the initramfs hook must copy instead of symlink
 				G_EXEC mv "$dir/.build/images/TVBoxS90X/99-dietpi-uboot" /etc/initramfs/post-update.d/99-dietpi-uboot
-				# Generate the Amlogic multiboot script sources on /boot, compiled once U-Boot tools are installed
-			# - The source archive is deleted later, hence the .cmd files are staged here
+				# Stage the Amlogic multiboot script sources on /boot, compiled once U-Boot tools are installed
+				# - The source archive is deleted later, hence the .cmd files are staged here
+				# - The multiboot U-Boot binaries are compiled from source by a dedicated CI workflow and shipped
+				#   as a package on the fork's "tvbox-s90x-u-boot" release: https://github.com/$G_GITOWNER/$GITREPO/releases/tag/tvbox-s90x-u-boot
 				G_DIETPI-NOTIFY 2 'Generating and fetching TVBox S90X multiboot U-Boot and boot scripts'
-				local dir_uboot_url='https://raw.githubusercontent.com/armbian/build/main/config/optional/boards/aml-s9xx-box/_packages/bsp-cli/boot'
 				G_EXEC cp "$dir/.build/images/TVBoxS90X/aml-autoscript.cmd" /boot/aml-autoscript.cmd
 				G_EXEC cp "$dir/.build/images/TVBoxS90X/s905-autoscript.cmd" /boot/s905-autoscript.cmd
 				G_EXEC cp "$dir/.build/images/TVBoxS90X/emmc-autoscript.cmd" /boot/emmc-autoscript.cmd
-				G_EXEC_OUTPUT=1 G_EXEC curl -sfL "$dir_uboot_url/u-boot-s905x-s912" -o /boot/u-boot.ext
-				G_EXEC_OUTPUT=1 G_EXEC curl -sfL "$dir_uboot_url/u-boot-s905x2-s922" -o /boot/u-boot-s905x2-s922
+				G_EXEC_OUTPUT=1 G_EXEC curl -sfL "https://github.com/$G_GITOWNER/$GITREPO/releases/download/tvbox-s90x-u-boot/linux-u-boot-110-current.deb" -o /tmp/linux-u-boot-110-current.deb
+				G_EXEC dpkg -i /tmp/linux-u-boot-110-current.deb
+				G_EXEC rm /tmp/linux-u-boot-110-current.deb
+				G_EXEC cp /usr/lib/linux-u-boot-110-current/u-boot-s905x-s912 /boot/u-boot.ext
+				G_EXEC cp /usr/lib/linux-u-boot-110-current/u-boot-s905x2-s922 /boot/u-boot-s905x2-s922
 				G_EXEC cp "$dir/.build/images/TVBoxS90X/install-dietpi.emmc.sh" /boot/install-dietpi.emmc.sh
 
 			# Rockchip 64-bit

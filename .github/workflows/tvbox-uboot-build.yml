@@ -1,0 +1,73 @@
+name: TVBox-S90X-U-Boot
+on:
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+permissions:
+  contents: write # publish/update the "tvbox-s90x-u-boot" release
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Install build prerequisites
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends git make crossbuild-essential-arm64 bc bison flex libssl-dev u-boot-tools
+
+    - name: Build u-boot-s905x-s912 from source
+      run: |
+        set -euo pipefail
+        git clone --depth 1 --branch v2020.07 https://github.com/u-boot/u-boot.git "$RUNNER_TEMP/u-boot-s905x"
+        cd "$RUNNER_TEMP/u-boot-s905x"
+        curl -sfL 'https://raw.githubusercontent.com/armbian/build/main/config/optional/boards/aml-s9xx-box/_packages/bsp-cli/boot/build-u-boot/u-boot-s905x-s912.patch' | patch -p1
+        make libretech-cc_defconfig
+        make -j"$(nproc)" CROSS_COMPILE=aarch64-linux-gnu- ARCH=arm
+        cp u-boot.bin u-boot-s905x-s912
+
+    - name: Build u-boot-s905x2-s922 from source
+      run: |
+        set -euo pipefail
+        git clone --depth 1 --branch v2024.01 https://github.com/u-boot/u-boot.git "$RUNNER_TEMP/u-boot-s922"
+        cd "$RUNNER_TEMP/u-boot-s922"
+        curl -sfL 'https://raw.githubusercontent.com/armbian/build/main/config/optional/boards/aml-s9xx-box/_packages/bsp-cli/boot/build-u-boot/u-boot-s905x2-s922.patch' | patch -p1
+        make sei510_defconfig
+        make -j"$(nproc)" CROSS_COMPILE=aarch64-linux-gnu- ARCH=arm
+        cp u-boot.bin u-boot-s905x2-s922
+
+    - name: Package linux-u-boot-110-current
+      run: |
+        set -euo pipefail
+        pkgdir="$RUNNER_TEMP/pkg"
+        mkdir -p "$pkgdir/DEBIAN" "$pkgdir/usr/lib/linux-u-boot-110-current"
+        cp "$RUNNER_TEMP/u-boot-s905x/u-boot-s905x-s912" "$pkgdir/usr/lib/linux-u-boot-110-current/"
+        cp "$RUNNER_TEMP/u-boot-s922/u-boot-s905x2-s922" "$pkgdir/usr/lib/linux-u-boot-110-current/"
+        {
+          echo 'Package: linux-u-boot-110-current'
+          echo "Version: $(date -u +%Y%m%d.%H%M)"
+          echo 'Section: kernel'
+          echo 'Priority: optional'
+          echo 'Architecture: arm64'
+          echo 'Maintainer: DietPi-S90X fork <https://github.com/sajjadsabzkar/DietPi-S90X>'
+          echo 'Description: Armbian multiboot U-Boot for Amlogic S90X TV boxes'
+          echo ' Compiled from U-Boot mainline source with the Armbian aml-s9xx-box'
+          echo ' patches, following the build instructions from the Armbian build'
+          echo ' repository. Installed by the DietPi-Build installer for HW model 110.'
+        } > "$pkgdir/DEBIAN/control"
+        dpkg-deb --root-owner-group --build "$pkgdir" linux-u-boot-110-current.deb
+        sha256sum linux-u-boot-110-current.deb > linux-u-boot-110-current.deb.sha256
+
+    - name: Publish linux-u-boot-110-current deb
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        set -euo pipefail
+        shopt -s nullglob
+        assets=( linux-u-boot-110-current.deb linux-u-boot-110-current.deb.sha256 )
+        [[ -f ${assets[0]} ]] || { echo '::error::U-Boot package missing'; exit 1; }
+        if gh release view 'tvbox-s90x-u-boot' --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1
+        then
+          gh release upload 'tvbox-s90x-u-boot' "${assets[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+        else
+          gh release create 'tvbox-s90x-u-boot' "${assets[@]}" --title 'TVBox S90X multiboot U-Boot' --notes 'U-Boot binaries for Amlogic S90X/S922 TV boxes, compiled from source (U-Boot mainline + Armbian aml-s9xx-box patches).' --repo "$GITHUB_REPOSITORY"
+        fi

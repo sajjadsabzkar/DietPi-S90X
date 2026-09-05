@@ -22,11 +22,11 @@ The boxes ship with an Android firmware incl. vendor U-Boot in the internal eMMC
 
 ## U-Boot binaries
 
-The actual U-Boot binaries (`u-boot-s905x-s912` as default `u-boot.ext`, `u-boot-s905x2-s922` for S905X2/S905X3 boxes) are downloaded at image build time from the Armbian build system, which compiles them from source:
+The actual U-Boot binaries (`u-boot-s905x-s912` as default `u-boot.ext`, `u-boot-s905x2-s922` for S905X2/S905X3 boxes) are **compiled from source** by the `tvbox-uboot-build` GitHub Actions workflow and shipped to the fork's `tvbox-s90x-u-boot` release as the `linux-u-boot-110-current` package, which the DietPi installer downloads and installs (`dpkg -i`) at image build time.
 
-https://github.com/armbian/build/tree/main/config/optional/boards/aml-s9xx-box/_packages/bsp-cli/boot
+The build follows the instructions of the Armbian `aml-s9xx-box` board config (used by balbes150/hexdump0815), which has `BOOTCONFIG='none'` and boots via the vendor U-Boot plus these chain-load scripts:
 
-- Built for the `aml-s9xx-box` Armbian board (used by balbes150/hexdump0815): `BOOTCONFIG='none'`, booting via the vendor U-Boot and these chain-load scripts.
-- Per the `readme.txt` in that directory, `u-boot-s905x-s912` is built from U-Boot `v2020.07` + patch with `libretech-cc_defconfig`, `u-boot-s905x2-s922` from U-Boot `v2024.01` + patch with `sei510_defconfig`.
+- `u-boot-s905x-s912`: U-Boot `v2020.07` + `u-boot-s905x-s912.patch`, `libretech-cc_defconfig`: https://github.com/armbian/build/tree/main/config/optional/boards/aml-s9xx-box/_packages/bsp-cli/boot/build-u-boot
+- `u-boot-s905x2-s922`: U-Boot `v2024.01` + `u-boot-s905x2-s922.patch`, `sei510_defconfig` (same source directory).
 
 To boot S905X2/S905X3 boxes, rename/copy `u-boot-s905x2-s922` (already on the boot partition) to `u-boot.ext`.
